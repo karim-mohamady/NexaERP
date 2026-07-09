@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Bell, LayoutDashboard, LogOut, Menu, Moon, Search, Sun } from 'lucide-react'
+import { Bell, LayoutDashboard, LogOut, Menu, Moon, Search, Sun, X } from 'lucide-react'
+import { useState } from 'react'
 import { modules, utilityLinks } from '../../lib/modules'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -8,6 +9,7 @@ import { t } from '../../i18n/translations'
 export function Shell() {
   const { user, logout } = useAuth()
   const { theme, setTheme, lang, setLang } = useTheme()
+  const [mobileOpen, setMobileOpen] = useState(false)
   const navigate = useNavigate()
 
   async function signOut() {
@@ -18,32 +20,52 @@ export function Shell() {
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${isActive ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'}`
 
+  const nav = (
+    <nav className="mt-8 space-y-1">
+      <NavLink onClick={() => setMobileOpen(false)} className={navClass} to="/app/dashboard"><LayoutDashboard size={18} />{t(lang, 'dashboard')}</NavLink>
+      {modules.map((item) => <NavLink onClick={() => setMobileOpen(false)} key={item.key} className={navClass} to={`/app/${item.key}`}><item.icon size={18} />{t(lang, item.labelKey)}</NavLink>)}
+      {utilityLinks.map((item) => <NavLink onClick={() => setMobileOpen(false)} key={item.to} className={navClass} to={item.to}><item.icon size={18} />{t(lang, item.labelKey)}</NavLink>)}
+    </nav>
+  )
+
+  const brand = (
+    <div className="flex items-center gap-3 px-2">
+      <div className="grid size-10 place-items-center rounded-lg bg-cyan-500 text-lg font-black text-white shadow-sm shadow-cyan-500/30">N</div>
+      <div>
+        <p className="font-semibold">NexaERP</p>
+        <p className="text-xs text-slate-500">Enterprise command center</p>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
-      <aside className="fixed inset-y-0 start-0 z-30 hidden w-72 border-e border-slate-200 bg-white px-4 py-5 dark:border-slate-800 dark:bg-slate-950 lg:block">
-        <div className="flex items-center gap-3 px-2">
-          <div className="grid size-10 place-items-center rounded-lg bg-cyan-500 text-lg font-black text-white">N</div>
-          <div>
-            <p className="font-semibold">NexaERP</p>
-            <p className="text-xs text-slate-500">Enterprise command center</p>
-          </div>
-        </div>
-        <nav className="mt-8 space-y-1">
-          <NavLink className={navClass} to="/app/dashboard"><LayoutDashboard size={18} />{t(lang, 'dashboard')}</NavLink>
-          {modules.map((item) => <NavLink key={item.key} className={navClass} to={`/app/${item.key}`}><item.icon size={18} />{item.label}</NavLink>)}
-          {utilityLinks.map((item) => <NavLink key={item.to} className={navClass} to={item.to}><item.icon size={18} />{item.label}</NavLink>)}
-        </nav>
+      <aside className="fixed inset-y-0 start-0 z-30 hidden w-72 overflow-y-auto border-e border-slate-200 bg-white px-4 py-5 dark:border-slate-800 dark:bg-slate-950 lg:block">
+        {brand}
+        {nav}
       </aside>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm lg:hidden">
+          <aside className="h-full w-80 max-w-[85vw] overflow-y-auto border-e border-slate-200 bg-white px-4 py-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between">
+              {brand}
+              <button onClick={() => setMobileOpen(false)} className="grid size-10 place-items-center rounded-md border border-slate-200 dark:border-slate-800" aria-label="Close menu"><X size={18} /></button>
+            </div>
+            {nav}
+          </aside>
+        </div>
+      )}
 
       <div className="lg:ps-72">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-          <button className="grid size-10 place-items-center rounded-md border border-slate-200 dark:border-slate-800 lg:hidden"><Menu size={18} /></button>
+          <button onClick={() => setMobileOpen(true)} className="grid size-10 place-items-center rounded-md border border-slate-200 dark:border-slate-800 lg:hidden" aria-label="Open menu"><Menu size={18} /></button>
           <div className="hidden min-w-0 flex-1 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 dark:border-slate-800 dark:bg-slate-900 md:flex">
             <Search size={18} />
-            <span className="text-sm">Search customers, invoices, products...</span>
+            <span className="text-sm">{t(lang, 'globalSearch')}</span>
           </div>
-          <button onClick={() => setLang(lang === 'en' ? 'ar' : 'en')} className="rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">{lang.toUpperCase()}</button>
-          <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="grid size-10 place-items-center rounded-md border border-slate-200 dark:border-slate-800">{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button>
+          <button onClick={() => setLang(lang === 'en' ? 'ar' : 'en')} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium dark:border-slate-800">{lang === 'en' ? 'AR' : 'EN'}</button>
+          <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="grid size-10 place-items-center rounded-md border border-slate-200 dark:border-slate-800" aria-label="Toggle theme">{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button>
           <button className="grid size-10 place-items-center rounded-md border border-slate-200 dark:border-slate-800"><Bell size={18} /></button>
           <NavLink to="/app/profile" className="hidden items-center gap-3 md:flex">
             <div className="grid size-9 place-items-center rounded-full bg-slate-900 text-sm font-semibold text-white dark:bg-white dark:text-slate-950">{user?.name?.[0] ?? 'A'}</div>

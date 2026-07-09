@@ -3,9 +3,12 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { Sparkles } from 'lucide-react'
 import { api } from '../../services/api'
 import { StatCard } from '../../components/ui/StatCard'
+import { useTheme } from '../../contexts/ThemeContext'
+import { t } from '../../i18n/translations'
 
 export function DashboardPage() {
   const [data, setData] = useState<any>(null)
+  const { lang } = useTheme()
 
   useEffect(() => {
     api.get('/dashboard/summary').then((response) => setData(response.data))
@@ -16,13 +19,13 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-sm text-slate-500">Today</p><h1 className="text-3xl font-semibold">Executive Dashboard</h1></div>
+        <div><p className="text-sm text-slate-500">{t(lang, 'today')}</p><h1 className="text-3xl font-semibold">{t(lang, 'dashboard')}</h1></div>
         <div className="flex gap-2"><input type="date" className="rounded-md border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900" /><input type="date" className="rounded-md border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900" /></div>
       </div>
-      <section className="grid gap-4 md:grid-cols-4">{data.kpis.map((kpi: any) => <StatCard key={kpi.label} {...kpi} />)}</section>
+      <section className="grid gap-4 md:grid-cols-4">{data.kpis.map((kpi: any) => <StatCard key={kpi.label} {...kpi} label={t(lang, String(kpi.label).toLowerCase())} />)}</section>
       <section className="grid gap-4 xl:grid-cols-[1.6fr_0.9fr]">
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-          <h2 className="font-semibold">Revenue, expenses, profit</h2>
+          <h2 className="font-semibold">{t(lang, 'revenueChart')}</h2>
           <div className="mt-4 h-80">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.series}>
@@ -37,14 +40,14 @@ export function DashboardPage() {
           </div>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-950">
-          <div className="flex items-center gap-2"><Sparkles size={18} className="text-cyan-500" /><h2 className="font-semibold">AI insights</h2></div>
+          <div className="flex items-center gap-2"><Sparkles size={18} className="text-cyan-500" /><h2 className="font-semibold">{t(lang, 'aiInsights')}</h2></div>
           <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">{data.notifications.map((item: any) => <div key={item.title} className="rounded-md bg-slate-50 p-3 dark:bg-slate-900"><strong className="block text-slate-950 dark:text-white">{item.title}</strong>{item.body}</div>)}</div>
         </div>
       </section>
       <section className="grid gap-4 lg:grid-cols-3">
-        <Panel title="Recent invoices" rows={data.recent_invoices} columns={['number', 'status', 'grand_total']} />
-        <Panel title="Recent customers" rows={data.recent_customers} columns={['name', 'email', 'status']} />
-        <Panel title="Inventory alerts" rows={data.low_stock} columns={['name', 'sku', 'stock_quantity']} />
+        <Panel title={t(lang, 'recentInvoices')} rows={data.recent_invoices} columns={['number', 'status', 'grand_total']} />
+        <Panel title={t(lang, 'recentCustomers')} rows={data.recent_customers} columns={['name', 'email', 'status']} />
+        <Panel title={t(lang, 'inventoryAlerts')} rows={data.low_stock} columns={['name', 'sku', 'stock_quantity']} />
       </section>
     </div>
   )
