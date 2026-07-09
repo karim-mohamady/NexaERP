@@ -1,0 +1,7 @@
+/backend/vendor
+/backend/.env
+/backend/nexaerp
+/backend/database/*.sqlite
+/frontend/node_modules
+/frontend/dist
+/.npm-cache
