@@ -20,4 +20,9 @@ class Invoice extends Model
         'is_active' => 'boolean',
         'is_cash_bank' => 'boolean',
     ];
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
 }

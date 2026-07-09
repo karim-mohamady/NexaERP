@@ -20,4 +20,9 @@ class AuditLog extends Model
         'is_active' => 'boolean',
         'is_cash_bank' => 'boolean',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

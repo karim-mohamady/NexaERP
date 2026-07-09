@@ -3,6 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Account;
+use App\Models\CostCenter;
+use App\Models\DashboardWidget;
+use App\Models\Deal;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Customer;
@@ -17,11 +20,22 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseOrder;
+use App\Models\SavedReport;
 use App\Models\Setting;
+use App\Models\StockAdjustment;
+use App\Models\StockTransfer;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Models\Supplier;
+use App\Models\Task;
 use App\Models\Unit;
 use App\Models\User;
+use App\Models\UsageLimit;
 use App\Models\Warehouse;
+use App\Models\Workflow;
+use App\Models\WorkflowRequest;
+use App\Models\WorkflowRequestStep;
+use App\Models\WorkflowStep;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
@@ -43,6 +57,9 @@ class DatabaseSeeder extends Seeder
             'hr.view', 'hr.create', 'hr.update', 'hr.delete',
             'accounting.view', 'accounting.create', 'accounting.update', 'accounting.delete',
             'reports.view', 'settings.update',
+            'invoices.approve', 'purchases.approve', 'expenses.approve', 'reports.export',
+            'workflows.manage', 'settings.manage', 'audit-logs.view', 'notifications.manage',
+            'files.manage', 'ai-settings.manage',
         ];
 
         foreach ($permissions as $permission) {
@@ -232,6 +249,97 @@ class DatabaseSeeder extends Seeder
             ['invoice', 'prefix', 'INV'],
         ] as [$group, $key, $value]) {
             Setting::updateOrCreate(['company_id' => $company->id, 'group' => $group, 'key' => $key], ['value' => $value]);
+        }
+
+        $invoiceWorkflow = Workflow::updateOrCreate(
+            ['company_id' => $company->id, 'module' => 'invoices', 'name' => 'Invoice approval over 5,000'],
+            ['branch_id' => $main->id, 'trigger_type' => 'amount_threshold', 'amount_threshold' => 5000, 'required_role' => 'Manager', 'status' => 'active', 'is_active' => true]
+        );
+        $managerStep = WorkflowStep::updateOrCreate(
+            ['workflow_id' => $invoiceWorkflow->id, 'approval_order' => 1],
+            ['name' => 'Manager review', 'required_role' => 'Manager', 'is_final' => true]
+        );
+        $requester = User::where('email', 'sales.manager@nexaerp.com')->first() ?? User::where('email', 'admin@nexaerp.com')->first();
+        $approvalRequest = WorkflowRequest::updateOrCreate(
+            ['company_id' => $company->id, 'module' => 'invoices', 'record_id' => Invoice::where('company_id', $company->id)->first()?->id],
+            ['branch_id' => $main->id, 'workflow_id' => $invoiceWorkflow->id, 'requested_by' => $requester?->id, 'record_type' => Invoice::class, 'amount' => 7200, 'status' => 'pending', 'comments' => 'Demo approval awaiting manager review.', 'submitted_at' => now()]
+        );
+        WorkflowRequestStep::updateOrCreate(
+            ['workflow_request_id' => $approvalRequest->id, 'approval_order' => 1],
+            ['workflow_step_id' => $managerStep->id, 'required_role' => 'Manager', 'status' => 'pending']
+        );
+
+        foreach ([
+            ['Approval request', 'Invoice approval request is waiting for your review.', 'approval request', 'high', '/app/approvals'],
+            ['Low stock alert', 'Several products are below reorder threshold.', 'low stock', 'normal', '/app/low-stock-alerts'],
+            ['AI alert', 'Cashflow and inventory recommendations are ready.', 'AI alert', 'normal', '/app/ai-copilot'],
+        ] as [$title, $body, $type, $priority, $url]) {
+            \App\Models\Notification::firstOrCreate(
+                ['company_id' => $company->id, 'title' => $title],
+                ['body' => $body, 'type' => $type, 'priority' => $priority, 'action_url' => $url, 'data' => ['source' => 'seed']]
+            );
+        }
+
+        foreach (['Operations', 'Sales', 'Finance'] as $i => $name) {
+            CostCenter::firstOrCreate(['company_id' => $company->id, 'code' => 'CC'.($i + 1)], ['name' => $name]);
+        }
+
+        $admin = User::where('email', 'admin@nexaerp.com')->first();
+        foreach ([
+            ['widget_type' => 'kpi', 'title' => 'Pending approvals', 'position' => 1, 'size' => 'sm'],
+            ['widget_type' => 'line_chart', 'title' => 'Sales trend', 'position' => 2, 'size' => 'lg'],
+            ['widget_type' => 'recent_activity', 'title' => 'Recent activity', 'position' => 3, 'size' => 'md'],
+        ] as $widget) {
+            DashboardWidget::firstOrCreate(['company_id' => $company->id, 'user_id' => $admin->id, 'title' => $widget['title']], $widget + ['config' => ['period' => 'month']]);
+        }
+
+        SavedReport::firstOrCreate(['company_id' => $company->id, 'report_name' => 'Monthly Sales Snapshot'], [
+            'owner_id' => $admin->id,
+            'module' => 'invoices',
+            'selected_columns' => ['number', 'invoice_date', 'status', 'grand_total'],
+            'filters' => ['status' => 'paid'],
+            'group_by' => 'status',
+            'sort_by' => 'invoice_date',
+        ]);
+
+        Task::firstOrCreate(['company_id' => $company->id, 'title' => 'Follow up strategic customers'], [
+            'assigned_to' => $admin->id,
+            'description' => 'Call top accounts and schedule renewal conversations.',
+            'due_date' => now()->addDays(3)->toDateString(),
+            'priority' => 'high',
+            'status' => 'open',
+        ]);
+
+        $warehouseA = $warehouses->first();
+        $warehouseB = $warehouses->skip(1)->first();
+        $product = $products->first();
+        if ($warehouseA && $warehouseB && $product) {
+            StockTransfer::firstOrCreate(['company_id' => $company->id, 'product_id' => $product->id], [
+                'from_warehouse_id' => $warehouseA->id,
+                'to_warehouse_id' => $warehouseB->id,
+                'quantity' => 8,
+                'status' => 'draft',
+                'transfer_date' => now()->toDateString(),
+                'notes' => 'Demo transfer for Phase 2 inventory workflow.',
+            ]);
+            StockAdjustment::firstOrCreate(['company_id' => $company->id, 'product_id' => $product->id, 'warehouse_id' => $warehouseA->id], [
+                'quantity_delta' => -2,
+                'reason' => 'Cycle count variance',
+                'status' => 'pending',
+            ]);
+        }
+
+        Deal::firstOrCreate(['company_id' => $company->id, 'title' => 'Enterprise renewal pipeline'], [
+            'customer_id' => $customers->first()?->id,
+            'stage' => 'proposal',
+            'value' => 18000,
+            'expected_close_date' => now()->addDays(21)->toDateString(),
+        ]);
+
+        $plan = SubscriptionPlan::firstOrCreate(['name' => 'Growth'], ['monthly_price' => 199, 'features' => ['approvals', 'ai', 'exports']]);
+        Subscription::firstOrCreate(['company_id' => $company->id], ['subscription_plan_id' => $plan->id, 'status' => 'trial', 'starts_at' => now()->toDateString(), 'ends_at' => now()->addDays(14)->toDateString()]);
+        foreach ([['users', 100, 9], ['storage_mb', 2048, 128], ['ai_requests', 500, 12]] as [$metric, $limit, $used]) {
+            UsageLimit::firstOrCreate(['company_id' => $company->id, 'metric' => $metric], ['limit' => $limit, 'used' => $used]);
         }
     }
 }

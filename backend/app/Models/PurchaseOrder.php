@@ -20,4 +20,9 @@ class PurchaseOrder extends Model
         'is_active' => 'boolean',
         'is_cash_bank' => 'boolean',
     ];
+
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class);
+    }
 }

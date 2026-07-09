@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -58,6 +59,7 @@ abstract class GenericCrudController extends Controller
         }
 
         $record = $this->modelClass::create($data);
+        app(AuditLogger::class)->log($request, $model->getTable(), 'create', $record->id, [], $record->toArray());
 
         return response()->json($record, 201);
     }
@@ -74,14 +76,19 @@ abstract class GenericCrudController extends Controller
     public function update(Request $request, int $id)
     {
         $record = $this->findScoped($request, $id);
+        $old = $record->toArray();
         $record->update($this->validatedData($request, true));
+        app(AuditLogger::class)->log($request, $record->getTable(), 'update', $record->id, $old, $record->fresh()->toArray());
 
         return response()->json($record->refresh());
     }
 
     public function destroy(Request $request, int $id)
     {
-        $this->findScoped($request, $id)->delete();
+        $record = $this->findScoped($request, $id);
+        $old = $record->toArray();
+        $record->delete();
+        app(AuditLogger::class)->log($request, $record->getTable(), 'delete', $id, $old, []);
 
         return response()->json(['message' => 'Deleted successfully']);
     }

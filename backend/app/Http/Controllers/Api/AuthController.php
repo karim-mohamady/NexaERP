@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -37,7 +38,7 @@ class AuthController extends Controller
         return response()->json($this->tokenResponse($user), 201);
     }
 
-    public function login(Request $request)
+    public function login(Request $request, AuditLogger $audit)
     {
         $data = $request->validate([
             'email' => ['required', 'email'],
@@ -54,6 +55,7 @@ class AuthController extends Controller
         }
 
         $user->forceFill(['last_login_at' => now()])->save();
+        $audit->log($request, 'auth', 'login', $user->id);
 
         return response()->json($this->tokenResponse($user));
     }
@@ -99,8 +101,9 @@ class AuthController extends Controller
         return response()->json(['message' => 'Password changed. Please sign in again.']);
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request, AuditLogger $audit)
     {
+        $audit->log($request, 'auth', 'logout', $request->user()?->id);
         $request->user()?->currentAccessToken()?->delete();
 
         return response()->json(['message' => 'Logged out successfully.']);
